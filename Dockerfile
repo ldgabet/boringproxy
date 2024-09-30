@@ -22,11 +22,31 @@ RUN cd cmd/boringproxy && CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} \
 	go build -ldflags "-X main.Version=${VERSION}" \
 	-o boringproxy
 
-FROM scratch
-EXPOSE 80 443
+FROM ubuntu:24.04
 WORKDIR /storage
 
-COPY --from=builder /build/cmd/boringproxy/boringproxy /
+COPY --from=builder /build/cmd/boringproxy/boringproxy /usr/sbin/
 
-ENTRYPOINT ["/boringproxy"]
-CMD ["version"]
+RUN apt-get update \
+	 && apt-get install --no-install-recommends --yes \
+	 dropbear \
+	 # To clean after install
+	 && apt-get clean \
+	 && rm -rf /var/lib/apt/lists/*
+
+# COPY docker/server/run/dropbear.sh /dropbear.sh
+# RUN /bin/sh /dropbear.sh
+
+# Copier le script d'initialisation
+COPY docker/server/run/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Définir le point d'entrée
+ENTRYPOINT ["/entrypoint.sh"]
+
+# RUN mkdir -p /root/.ssh && \
+#     touch /root/.ssh/authorized_keys
+
+EXPOSE 80 443 22
+
+CMD ["boringproxy", "version"]
